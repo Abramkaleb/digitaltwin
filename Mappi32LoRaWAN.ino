@@ -2,7 +2,7 @@
 
 #include <lorawan.h>
 #include <max6675.h>
-
+#include <NewPing.h>
 
 //ABP Credentials
 const char *devAddr = "e7ff96be";
@@ -10,25 +10,33 @@ const char *nwkSKey = "5fe73ec991d0d8bb0000000000000000";
 const char *appSKey = "00000000000000004bd2da90a6b504c5";
 
 
-
 // defines pins numbers for Ultrasonic Sensor HC-SR04 (Sensor Fuel) 
-const int trigPin = 33;
-const int echoPin = 32;
+#define TRIGGER_PIN  33
+#define ECHO_PIN     32
+#define MAX_DISTANCE 400 // Maximum distance we want to measure (in centimeters).
 
-// defines variables
-long duration;
-int distance;
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
+
 
 // defines pins numbers for Thermocouple Sensor MAX6675 (Sensor Temperature) 
 int thermoDO = 23; //ini masi nyontek joki, blm tau soalnya beda
 int thermoCS = 19;
 int thermoCLK = 18;
 
+// defines pins number for IR Sensor (Sensor RPM)
+const int rpmPin = 26;
+
+volatile byte rpmcount;
+unsigned int rpm;
+unsigned long timeold;
+
+
+
 MAX6675 thermocouple(thermoCLK, thermoCS, thermoDO);
 
 // defines pins numbers for Flow rate of Water YF-S201 (Sensor Cooling Water)
 double flow; //Water flow L/Min 
-int flowsensor = 2; 
+int flowsensor = 17; 
 unsigned long currentTime;
 unsigned long lastTime;
 unsigned long pulse_freq;
@@ -55,6 +63,18 @@ const sRFM_pins RFM_pins = {
 };
 
 
+void pulse () // Interrupt function
+{
+   pulse_freq++;
+}
+
+
+void rpm_fun()
+{
+  rpmcount++;
+}
+
+
 
 void setup() {
   // Setup loraid access
@@ -62,9 +82,23 @@ void setup() {
   delay(2000);
 
   //sensor HC-SR04 (Sensor Fuel)
-  pinMode(trigPin, OUTPUT); // Sets the trigPin as an Output
-  pinMode(echoPin, INPUT); // Sets the echoPin as an Input
   
+  
+  //sensor YF-S201 (Sensor Cooling Water)
+   pinMode(flowsensor, INPUT);
+   Serial.begin(9600);
+   attachInterrupt(0, pulse, RISING); // Setup Interrupt
+   currentTime = millis();
+   lastTime = currentTime;
+
+
+  //sensor IR rpm
+
+  attachInterrupt(rpmPin, rpm_fun, FALLING);
+  rpmcount = 0;
+  rpm = 0;
+  timeold = 0;
+
 
   if (!lora.init()) {
     Serial.println("RFM95 not detected");
@@ -110,38 +144,66 @@ void lorawanrxtx(){
     Serial.print("Sending: ");
 
     //ini sensor jarak fuel
-     // Clears the trigPin
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-    // Sets the trigPin on HIGH state for 10 micro seconds
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
-    // Reads the echoPin, returns the sound wave travel time in microseconds
-    duration = pulseIn(echoPin, HIGH);
-    // Calculating the distance
-    distance = duration * 0.034 / 2;
-    // Prints the distance on the Serial Monitor
+    int distance = sonar.ping_cm(); // Send ping, get distance in cm and print result (0 = outside set distance range)
+
     Serial.print("Distance: ");
-    Serial.println(distance);
+    Serial.print(distance);
+    Serial.println("cm");
 
     //ini sensor temperature
+    int temp = thermocouple.readCelsius();
+
     Serial.print("Temperature = "); 
-    Serial.print(thermocouple.readCelsius());
+    Serial.print(temp);
     Serial.println("°C"); 
 
-    //read data from the sensor
-    float 
-   
+    
 
+    //ini sensor cooling water
+    lastTime = currentTime; 
+      // Pulse frequency (Hz) = 7.5Q, Q is flow rate in L/min.
+      flow = (pulse_freq / 7.5); 
+      pulse_freq = 0; // Reset Counter
+      Serial.print(flow, DEC); 
+      Serial.println(" L/Min");
+
+
+    //ini sensor IR RPM
+    delay(1000);
+    detachInterrupt(0);
+    rpm = 60*1000/(millis() - timeold)*rpmcount;
+    timeold = millis();
+    rpmcount = 0;
+
+    Serial.print("RPM = ");
+    Serial.print(rpm);
+    //attachInterrupt(0, rpm_fun, FALLING); --> sapa tau butuh
+
+
+    //read data from the sensor
+    float fuel = distance;
+    float temperature = temp;
+    float flow = flow; 
+    float rotation = rpm;
+
+    Serial.println("Sending: ");
+    dataSend = "{\"f\": " + String(fuel,2) + ", \"t\": " + String(temperature,2) +", \"f\": " + String(flow,2) +", \"r\": " + String(rotation,2) +"}";
+    dataSend.toCharArray(myStr,100);
     Serial.println(myStr);
+
+
     lora.sendUplink(myStr, strlen(myStr), 0);
     port = lora.getFramePortTx();
     channel = lora.getChannel();
     freq = lora.getChannelFreq(channel);
-    Serial.print(F("fport: "));    Serial.print(port);Serial.print(" ");
-    Serial.print(F("Ch: "));    Serial.print(channel);Serial.print(" ");
+    Serial.print(F("fport: "));   Serial.print(port);Serial.print(" ");
+    Serial.print(F("Ch: "));      Serial.print(channel);Serial.print(" ");
     Serial.print(F("Freq: "));    Serial.print(freq);Serial.println(" ");
+
+     Serial.print("Fuel: ");      Serial.print(fuel);       Serial.println("cm");
+     Serial.print("Temp: ");      Serial.print(temp);       Serial.println("c");
+     Serial.print("Flow: ");      Serial.print(flow);       Serial.println("L/m");
+     Serial.print("Rpm: ");       Serial.print(rotation);   Serial.println(" ");
 
   }
 
