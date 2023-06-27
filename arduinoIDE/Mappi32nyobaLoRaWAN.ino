@@ -11,7 +11,7 @@ const char *nwkSKey = "5fe73ec991d0d8bb0000000000000000";
 const char *appSKey = "00000000000000004bd2da90a6b504c5";
 
 const sRFM_pins RFM_pins = {
-  .CS = 5,
+  .CS = 15,
   .RST = 0,
   .DIO0 = 27,
   .DIO1 = 2,
