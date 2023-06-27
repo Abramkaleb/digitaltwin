@@ -1,7 +1,7 @@
 #include <lorawan.h>
 #include <max6675.h>
 #include <NewPing.h>
-
+#include <Servo.h>
 
 
 
@@ -63,6 +63,12 @@ unsigned long pulse_freq;
 unsigned long millisBefore;
 volatile int objects;
 
+
+Servo motorServo;
+const int pinServo=25;
+const int pinLed=5;
+int valServo;
+int Delay=0;
 
 
 
@@ -131,6 +137,14 @@ void setup() {
   rpmcount = 0;
   rpm = 0;
   timeold = 0;
+
+
+
+  //motor servo
+  motorServo.attach(pinServo); 
+  motorServo.write(0); 
+   
+
 }
 
 
@@ -213,6 +227,7 @@ void loop() {
  recvStatus = lora.readDataByte(outStr);
   if (recvStatus) {
     newmessage = true;
+    char outchar[255] = {};
     int counter = 0;
     port = lora.getFramePortRx();
     channel = lora.getChannelRx();
@@ -231,6 +246,7 @@ void loop() {
         for (int i = 0; i < recvStatus; i++)
         {
           Serial.print(char(outStr[i]));
+          outchar[i] = outStr[i];
         }
       }
       else
@@ -258,11 +274,21 @@ void loop() {
       Serial.print(F("Ch: "));    Serial.print(channel);Serial.print(" ");
       Serial.print(F("Freq: "));    Serial.println(freq);Serial.println(" ");
     }
-  }
+  
 
+    //downlink
 
-
-
+      stringout = (String)outchar;
+      Serial.println(stringout);
+      if (stringout == "1")
+      {
+        //digitalWrite(valServo);
+        Serial.print("Val Servo: " + valServo);
+        stringout="";
+        //motorServo.write(valServo);
+      }
+      
+    }
 
 
 
