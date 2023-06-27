@@ -18,7 +18,7 @@ const sRFM_pins RFM_pins = {
 };
 
 
- const unsigned long interval = 30000;    // 30 s interval to send message
+ const unsigned long interval = 1000;    // 30 s interval to send message
  unsigned long previousMillis = 0;  // will store last time message sent
  unsigned int counter = 0;     // message counter
 
@@ -94,10 +94,10 @@ void setup() {
 
  // Setup loraid access
   Serial.begin(115200);
-  delay(2000);
+  delay(1000);
   if (!lora.init()) {
     Serial.println("RFM95 not detected");
-    delay(5000);
+    delay(1000);
     return;
   }
 
@@ -125,8 +125,7 @@ void setup() {
   
   //sensor YF-S201 (Sensor Cooling Water)
    pinMode(flowsensor, INPUT);
-   Serial.begin(9600);
-   attachInterrupt(0, pulse, RISING); // Setup Interrupt
+      attachInterrupt(0, pulse, RISING); // Setup Interrupt
    currentTime = millis();
    lastTime = currentTime;
 
@@ -157,20 +156,22 @@ void loop() {
     if (millis() - previousMillis > interval) {
     previousMillis = millis();
 
-    sprintf(myStr, "Lora Counter-%d", counter++);
+    sprintf(myStr, "Lora Counter-%d\n", counter++);
 
 
     Serial.print("Sending: ");
     Serial.println(myStr);
-    lora.sendUplink(myStr, strlen(myStr), 0);
+      
+    //lora.sendUplink(myStr, strlen(myStr), 0);
+      
     port = lora.getFramePortTx();
     channel = lora.getChannel();
     freq = lora.getChannelFreq(channel);
 
 
     delay(1000);
-    Serial.println("Sending: ");
 
+      
     //ini sensor jarak fuel
     int distance = sonar.ping_cm(); // Send ping, get distance in cm and print result (0 = outside set distance range)
     int volume = 3.65 * (0.5 * 3.75) * (0.5 * 3.75) * (30 - distance);
@@ -207,7 +208,7 @@ void loop() {
     millisBefore = millis();
     }
 
-    delay(100);
+    delay(1000);
     objects++;
 
     Serial.print("     RPM = ");
